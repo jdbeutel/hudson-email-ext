@@ -2,11 +2,7 @@ package hudson.plugins.emailext;
 
 import hudson.Extension;
 import hudson.Launcher;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
-import hudson.model.BuildListener;
-import hudson.model.Hudson;
-import hudson.model.User;
+import hudson.model.*;
 import hudson.plugins.emailext.plugins.ContentBuilder;
 import hudson.plugins.emailext.plugins.EmailTrigger;
 import hudson.plugins.emailext.plugins.EmailTriggerDescriptor;
@@ -30,6 +26,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.nio.charset.Charset;
 
 import javax.mail.Address;
 import javax.mail.Authenticator;
@@ -46,6 +43,7 @@ import javax.servlet.ServletException;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.StaplerResponse;
 
 /**
  * {@link Publisher} that sends notification e-mail.
@@ -67,8 +65,10 @@ public class ExtendedEmailPublisher extends Notifier {
 	
 	public static final String PROJECT_DEFAULT_SUBJECT_TEXT = "$PROJECT_DEFAULT_SUBJECT";
 	public static final String PROJECT_DEFAULT_BODY_TEXT = "$PROJECT_DEFAULT_CONTENT";
-	
-	public static void addEmailTriggerType(EmailTriggerDescriptor triggerType) throws EmailExtException {
+
+    private static final String DEFAULT_CHARSET_SENTINAL = "default";
+
+    public static void addEmailTriggerType(EmailTriggerDescriptor triggerType) throws EmailExtException {
 		if(EMAIL_TRIGGER_TYPE_MAP.containsKey(triggerType.getMailerId()))
 			throw new EmailExtException("An email trigger type with name " +
 					triggerType.getTriggerName() + " was already added.");
@@ -113,6 +113,11 @@ public class ExtendedEmailPublisher extends Notifier {
 	 */
 	public String contentType;
 
+    /**
+     * The charset of the emails for this project.
+     */
+    public String charset;
+
 	/**
 	 * The default subject of the emails for this project.  ($PROJECT_DEFAULT_SUBJECT)
 	 */
@@ -123,6 +128,10 @@ public class ExtendedEmailPublisher extends Notifier {
 	 */
 	public String defaultContent;
 	
+	public boolean defaultContentIsScript;
+
+    public String buildForTesting;
+
 	/**
 	 * Get the list of configured email triggers for this project.
 	 */
@@ -260,9 +269,16 @@ public class ExtendedEmailPublisher extends Notifier {
 		//Set the contents of the email
 		msg.setSentDate(new Date());
 		String subject = new ContentBuilder().transformText(type.getSubject(), this, type, build);
-		msg.setSubject(subject);
+        String specificCharset = charset;
+        if (specificCharset == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(specificCharset)) {
+            specificCharset = DESCRIPTOR.getDefaultCharset();
+        }
+        if (specificCharset == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(specificCharset)) {
+            msg.setSubject(subject);
+        } else {
+            msg.setSubject(subject, specificCharset);
+        }
 		String text = new ContentBuilder().transformText(type.getBody(), this, type, build);
-		msg.setContent(text, contentType);
 		String messageContentType = contentType;
 		// contentType is null if the project was not reconfigured after upgrading.
 		if (messageContentType == null || "default".equals(messageContentType)) {
@@ -273,6 +289,9 @@ public class ExtendedEmailPublisher extends Notifier {
 				messageContentType = "text/plain";
 			}
 		}
+        if (specificCharset != null && !DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(specificCharset)) {
+            messageContentType += "; charset=" + specificCharset;
+        }
 		msg.setContent(text, messageContentType);
 
 		// Get the recipients from the global list of addresses
@@ -388,7 +407,12 @@ public class ExtendedEmailPublisher extends Notifier {
 		 * This is a global default content type (mime type) for emails.
 		 */
 		private String defaultContentType;
-		
+
+        /**
+         * This is a global default charset (mime type) for emails.
+         */
+        private String defaultCharset;
+
 		/**
 		 * This is a global default subject line for sending emails.
 		 */
@@ -399,9 +423,19 @@ public class ExtendedEmailPublisher extends Notifier {
 		 */
 		private String defaultBody;
 
+        /**
+         * This indicates that the global default body or subject line should be evaluated as a script.
+         */
+        private boolean defaultIsScript;
+
+        /**
+         * This just remembers the last build for testing that was saved, for the user's convenience.
+         */
+        public String defaultBuildForTesting;
+
 		private boolean overrideGlobalSettings;
-		
-		@Override
+
+        @Override
 		public String getDisplayName() {
 			return "Editable Email Notification";
 		}
@@ -495,9 +529,13 @@ public class ExtendedEmailPublisher extends Notifier {
 		public String getSmtpPort() {
 			return smtpPort;
 		}
-		
-		public String getDefaultContentType() {
-			return defaultContentType;
+
+        public String getDefaultContentType() {
+            return defaultContentType;
+        }
+
+        public String getDefaultCharset() {
+			return defaultCharset;
 		}
 		
 		public String getDefaultSubject() {
@@ -507,6 +545,14 @@ public class ExtendedEmailPublisher extends Notifier {
 		public String getDefaultBody() {
 			return defaultBody;
 		}
+
+        public boolean getDefaultIsScript() {
+            return defaultIsScript;
+        }
+
+        public String getDefaultBuildForTesting() {
+            return defaultBuildForTesting;
+        }
 		
 		public boolean getOverrideGlobalSettings() {
 			return overrideGlobalSettings;
@@ -525,10 +571,13 @@ public class ExtendedEmailPublisher extends Notifier {
 			ExtendedEmailPublisher m = new ExtendedEmailPublisher();
 			m.recipientList = listRecipients;
 			m.contentType = req.getParameter("project_content_type");
+            m.charset = req.getParameter("project_charset");
 			m.defaultSubject = req.getParameter("project_default_subject");
 			m.defaultContent = req.getParameter("project_default_content");
+			m.defaultContentIsScript = req.getParameter("project_default_content_is_script")!=null;
 			m.configuredTriggers = new ArrayList<EmailTrigger>();
-			
+            m.buildForTesting = req.getParameter("project_build_for_testing");
+
 			// Create a new email trigger for each one that is configured
 			for (String mailerId : EMAIL_TRIGGER_TYPE_MAP.keySet()) {
 				EmailType type = createMailType(req, mailerId);
@@ -556,6 +605,7 @@ public class ExtendedEmailPublisher extends Notifier {
 			m.setSendToRecipientList(req.getParameter(prefix + "sendToRecipientList")!=null);
 			m.setSendToDevelopers(req.getParameter(prefix + "sendToDevelopers")!=null);
 			m.setIncludeCulprits(req.getParameter(prefix + "includeCulprits")!=null);
+			m.setScript(req.getParameter(prefix + "script")!=null);
 			return m;
 		}
 		
@@ -602,11 +652,14 @@ public class ExtendedEmailPublisher extends Notifier {
 			smtpPort = nullify(req.getParameter("ext_mailer_smtp_port"));
 			
 			defaultContentType = nullify(req.getParameter("ext_mailer_default_content_type"));
+            defaultCharset = nullify(req.getParameter("ext_mailer_default_charset"));
 
 			// Allow global defaults to be set for the subject and body of the email
 			defaultSubject = nullify(req.getParameter("ext_mailer_default_subject"));
 			defaultBody = nullify(req.getParameter("ext_mailer_default_body"));
-			
+            defaultIsScript = req.getParameter("ext_mailer_default_is_script") != null;
+            defaultBuildForTesting = req.getParameter("ext_mailer_default_build_for_testing");
+
 			overrideGlobalSettings = req.getParameter("ext_mailer_use_global_settings") != null;
 			
 			save();
@@ -651,7 +704,128 @@ public class ExtendedEmailPublisher extends Notifier {
 			}
 			return FormValidation.ok();
 		}
-		
+
+        public FormValidation doCharsetCheck(StaplerRequest req, StaplerResponse rsp, @QueryParameter final String value) throws IOException, ServletException {
+            String charset = nullify(value);
+            if (charset == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(charset) || Charset.isSupported(charset)) {
+                return FormValidation.ok();
+            } else {
+                return FormValidation.error("unsupported charset");
+            }
+        }
+
+        public FormValidation doBuildForTestingCheck(StaplerRequest req, StaplerResponse rsp, @QueryParameter final String value) throws IOException, ServletException {
+            String buildForTesting = nullify(value);
+            if (buildForTesting == null) {
+                return FormValidation.ok();
+            }
+            try {
+                getBuildForTesting(buildForTesting);
+                return FormValidation.ok();
+            }
+            catch (FormValidation e) {
+                return e;
+            }
+        }
+
+        private interface TransformStrategy {
+            String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild build);
+        }
+
+        public FormValidation doTestAgainstBuild(StaplerRequest req, @QueryParameter("project_build_for_testing") String buildForTesting) throws IOException {
+            TransformStrategy strategy = new TransformStrategy() {
+                public String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild build) {
+                    return new ContentBuilder().transformText(origText, publisher, type, build);
+                }
+            };
+            return doTestAgainstBuild(strategy, PROJECT_DEFAULT_SUBJECT_TEXT, PROJECT_DEFAULT_BODY_TEXT, req, buildForTesting);
+        }
+
+        public FormValidation doGlobalTestAgainstBuild(StaplerRequest req,
+                                                       @QueryParameter("ext_mailer_default_build_for_testing") String buildForTesting,
+                                                       @QueryParameter("ext_mailer_default_is_script") final boolean globalIsScript,
+                                                       @QueryParameter("ext_mailer_default_subject") String globalSubject,
+                                                       @QueryParameter("ext_mailer_default_body") String globalBody
+        ) throws IOException {
+            TransformStrategy strategy = new TransformStrategy() {
+                public String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild build) {
+                    // This works around ContentBuilder.transformText()'s static access of the global subject and body,
+                    // which has not been updated before testing.
+                    return new ContentBuilder().transformResolvedText(globalIsScript, origText, publisher, type, build);
+                }
+            };
+            return doTestAgainstBuild(strategy, globalSubject, globalBody, req, buildForTesting);
+        }
+
+        private String testedEmailText;
+
+        private FormValidation doTestAgainstBuild(TransformStrategy strategy,
+                                                  String originalSubject,
+                                                  String originalBody,
+                                                  StaplerRequest req,
+                                                  String buildForTesting
+        ) throws IOException {
+            buildForTesting = nullify(buildForTesting);
+            if (buildForTesting == null) {
+                return FormValidation.error("need to configure a build for testing");
+            }
+            try {
+                AbstractBuild build = getBuildForTesting(buildForTesting);
+                ExtendedEmailPublisher publisher = (ExtendedEmailPublisher) newInstance(req, null);
+                EmailType type = new EmailType();
+                type.setBody(ExtendedEmailPublisher.PROJECT_DEFAULT_BODY_TEXT);
+                type.setSubject(ExtendedEmailPublisher.PROJECT_DEFAULT_SUBJECT_TEXT);
+                String subject = strategy.transformText(originalSubject, publisher, type, build);
+                testedEmailText = strategy.transformText(originalBody, publisher, type, build);
+                String resultUrl = req.getRequestURI().replace("testAgainstBuild", "testedEmailText")
+                        .replace("globalTestAgainstBuild", "testedEmailText"); // todo: some better hack
+                return FormValidation.okWithMarkup("resulting subject: " + subject
+                        + "<br/>resulting body:<br/> <iframe width='100%' height='400px' src='" + resultUrl + "'/>");
+            }
+            catch (FormValidation e) {
+                return e;
+            } catch (FormException e) {
+                return FormValidation.error(e.getMessage());
+            }
+        }
+
+        public void doTestedEmailText(StaplerRequest req, StaplerResponse rsp) throws IOException {
+            rsp.setContentType("text/html");
+            rsp.getWriter().write(testedEmailText);
+        }
+
+        private AbstractBuild getBuildForTesting(String buildForTesting) throws FormValidation {
+            int slashIndex = buildForTesting.indexOf('/');
+            if (slashIndex == -1) {
+                throw FormValidation.error("must format as '<jobName>/<buildNumber>'");
+            }
+            String jobName = buildForTesting.substring(0, slashIndex);
+            String buildNumber = buildForTesting.substring(slashIndex + 1);
+            Job job;
+            try {
+                job = (Job) Hudson.getInstance().getItem(jobName);
+            }
+            catch (ClassCastException e) {
+                throw FormValidation.error(jobName + " is not a job");
+            }
+            if (job == null) {
+                throw FormValidation.error(jobName + " job not found");
+            }
+            AbstractBuild build;
+            try {
+                build = (AbstractBuild) job.getBuildByNumber(Integer.valueOf(buildNumber));
+            }
+            catch (NumberFormatException e) {
+                throw FormValidation.error("cannot parse build number: " + e.getMessage());
+            }
+            catch (ClassCastException e) {
+                throw FormValidation.error("not a build: " + e.getMessage());
+            }
+            if (build == null) {
+                throw FormValidation.error("build " + buildNumber + " not found");
+            }
+            return build;
+        }
 	}
 
 

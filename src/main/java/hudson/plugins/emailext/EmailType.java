@@ -40,6 +40,11 @@ public class EmailType {
 	 */
 	private boolean sendToRecipientList;
 	
+	/**
+	 * Specifies whether the mail's content should be interpreted as Groovy script
+	 */
+	private boolean script;
+
 	public EmailType(){
 		subject = "";
 		body = "";
@@ -47,6 +52,7 @@ public class EmailType {
 		sendToDevelopers = false;
 		includeCulprits = false;
 		sendToRecipientList = false;
+		script = false;
 	}
 	
 	public String getSubject() {
@@ -104,4 +110,11 @@ public class EmailType {
 		this.recipientList = recipientList;
 	}
 	
+	public boolean isScript() {
+		return script;
+	}
+	
+	public void setScript(boolean script) {
+		this.script = script;
+	}
 }

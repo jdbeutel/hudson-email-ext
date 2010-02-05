@@ -122,6 +122,11 @@
 						name="mailer.${mailType}.body"
 						value="${mailTypeObj.body}"/>
 				</f:entry>
+				<f:entry title="Content is Script"
+					help="${rootURL}/plugin/email-ext/help/projectConfig/mailType/script.html">
+					<f:checkbox name="mailer.${mailType}.script"
+						checked="${mailTypeObj.script}" />
+				</f:entry>
 			</table>
 		</td>
 	</tr>

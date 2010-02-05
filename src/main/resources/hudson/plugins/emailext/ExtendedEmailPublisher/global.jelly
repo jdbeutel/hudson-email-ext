@@ -65,6 +65,12 @@
             >HTML (text/html)</f:option>
         </select>
       </f:entry>
+      <f:entry title="Default Charset"
+               help="${rootURL}/plugin/email-ext/help/globalConfig/defaultCharset.html">
+          <input class="setting-input validated" name="ext_mailer_default_charset"
+                 type="text" value="${descriptor.defaultCharset}"
+                 checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+encode(this.value)"/>
+      </f:entry>
       <f:entry title="Default Subject"
                help="${rootURL}/plugin/email-ext/help/globalConfig/defaultSubject.html">
         <input class="setting-input" name="ext_mailer_default_subject"
@@ -76,6 +82,21 @@
                     name="ext_mailer_default_body"
                     value="${descriptor.defaultBody}"/>
       </f:entry>
+      <f:entry title="Default is Script"
+               help="${rootURL}/plugin/email-ext/help/globalConfig/defaultIsScript.html">
+          <f:checkbox name="ext_mailer_default_is_script" checked="${descriptor.defaultIsScript}" />
+      </f:entry>
+
+      <f:entry title="Build for Testing"
+               help="${rootURL}/plugin/email-ext/help/globalConfig/buildForTesting.html">
+          <input class="setting-input validated" name="ext_mailer_default_build_for_testing"
+                 type="text" value="${descriptor.defaultBuildForTesting}"
+                 checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/buildForTestingCheck?value='+encode(this.value)"/>
+      </f:entry>
+
+      <f:validateButton  title="${%Test Against Build}" method="globalTestAgainstBuild"
+                         with="ext_mailer_default_build_for_testing,ext_mailer_default_is_script,ext_mailer_default_subject,ext_mailer_default_body,ext_mailer_default_charset,ext_mailer_default_content_type" />
+
       <!-- This is the help section.  It displays a bunch of dynamic help for all content tokens. -->
       <tr>
         <td></td>

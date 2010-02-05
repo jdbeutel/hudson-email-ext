@@ -1,5 +1,7 @@
 package hudson.plugins.emailext.plugins;
 
+import groovy.text.SimpleTemplateEngine;
+import groovy.text.Template;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.plugins.emailext.EmailExtException;
@@ -61,13 +63,23 @@ public class ContentBuilder {
 	
 	public <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
 	String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, B build) {
-		String newText = origText.replaceAll(PROJECT_DEFAULT_BODY, Matcher.quoteReplacement(publisher.defaultContent))
-		 						 .replaceAll(PROJECT_DEFAULT_SUBJECT, Matcher.quoteReplacement(publisher.defaultSubject))
-								 .replaceAll(DEFAULT_BODY, Matcher.quoteReplacement(ExtendedEmailPublisher.DESCRIPTOR.getDefaultBody()))
-								 .replaceAll(DEFAULT_SUBJECT, Matcher.quoteReplacement(ExtendedEmailPublisher.DESCRIPTOR.getDefaultSubject()));
-						
-		newText = replaceTokensWithContent(newText, publisher, type, build);
-		return newText;
+        boolean isScript = type.isScript();
+		String projectlyResolvedText = origText.replaceAll(PROJECT_DEFAULT_BODY, Matcher.quoteReplacement(publisher.defaultContent))
+		 						 .replaceAll(PROJECT_DEFAULT_SUBJECT, Matcher.quoteReplacement(publisher.defaultSubject));
+        boolean usingSomeProjectDefaultContent = !projectlyResolvedText.equals(origText);
+        isScript |= publisher.defaultContentIsScript && usingSomeProjectDefaultContent;
+        String globallyResolvedText = projectlyResolvedText.replaceAll(DEFAULT_BODY, Matcher.quoteReplacement(ExtendedEmailPublisher.DESCRIPTOR.getDefaultBody()))
+                .replaceAll(DEFAULT_SUBJECT, Matcher.quoteReplacement(ExtendedEmailPublisher.DESCRIPTOR.getDefaultSubject()));
+        boolean usingSomeGlobalDefaultContent = !globallyResolvedText.equals(projectlyResolvedText);
+        isScript |= ExtendedEmailPublisher.DESCRIPTOR.getDefaultIsScript() && usingSomeGlobalDefaultContent;
+        return transformResolvedText(isScript, globallyResolvedText, publisher, type, build);
+    }
+
+    // exposed for testing
+    public <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
+    String transformResolvedText(boolean isScript, String text, ExtendedEmailPublisher publisher, EmailType type, B build) {
+		return isScript ? transformUsingScript(text, publisher, type, build)
+		                       : replaceTokensWithContent(text, publisher, type, build);
 	}
 	
 	private static <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
@@ -191,6 +203,36 @@ public class ContentBuilder {
 			tokenMatcher.appendTail(sb);
 		}
 		
+	}
+
+	private <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
+	String transformUsingScript(String origText, ExtendedEmailPublisher publisher, EmailType type, B build) {
+		SimpleTemplateEngine engine = new SimpleTemplateEngine();
+		Template template = null;
+		try {
+			template = engine.createTemplate(origText);
+			Map binding = new HashMap();
+			Map<String,Object> args = new HashMap<String,Object>();
+			//Setting the AbstractBuild as a bind variable
+			binding.put("build", build);
+
+			//Set all the EmailContent as bind variables to be directly used in the script 
+			for(Map.Entry<String, EmailContent> contentEntry : EMAIL_CONTENT_TYPE_MAP.entrySet()){
+				EmailContent content = contentEntry.getValue();
+				String contentText = content.getContent(build, publisher, type, args);
+				if(content.hasNestedContent()){
+					contentText = replaceTokensWithContent(contentText, publisher, type, build);
+				}
+				binding.put(contentEntry.getKey(), contentText);
+			}
+
+			return template.make(binding).toString();
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "Error creating GroovyTemplate from text ["+origText+"]",e);
+			//Throwing the exception as Runtime as any exception here would mostly (?) be due to incorrect script
+			//and not an expected reason
+			throw new RuntimeException("Error using the template",e);
+		}
 	}
 
 }
