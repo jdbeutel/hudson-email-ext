@@ -9,11 +9,25 @@ import hudson.plugins.emailext.plugins.EmailTriggerDescriptor;
 import hudson.scm.ChangeLogSet.Entry;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
+import hudson.tasks.MailMessageIdAction;
 import hudson.tasks.Mailer;
 import hudson.tasks.Notifier;
 import hudson.tasks.Publisher;
 import hudson.util.FormValidation;
+import net.sf.json.JSONObject;
+import org.kohsuke.stapler.*;
 
+import javax.mail.Address;
+import javax.mail.Authenticator;
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.AddressException;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+import javax.servlet.ServletException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,7 +57,6 @@ import javax.servlet.ServletException;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.StaplerResponse;
 
 /**
  * {@link Publisher} that sends notification e-mail.
@@ -66,6 +79,8 @@ public class ExtendedEmailPublisher extends Notifier {
 	public static final String PROJECT_DEFAULT_SUBJECT_TEXT = "$PROJECT_DEFAULT_SUBJECT";
 	public static final String PROJECT_DEFAULT_BODY_TEXT = "$PROJECT_DEFAULT_CONTENT";
 
+    public static final String CHARSET = "utf-8";
+    
     private static final String DEFAULT_CHARSET_SENTINAL = "default";
 
     public static void addEmailTriggerType(EmailTriggerDescriptor triggerType) throws EmailExtException {
@@ -109,11 +124,11 @@ public class ExtendedEmailPublisher extends Notifier {
 	private List<EmailTrigger> configuredTriggers = new ArrayList<EmailTrigger>();
 
 	/**
-	 * The contentType of the emails for this project.
+	 * The contentType of the emails for this project (text/html, text/plain, etc).
 	 */
 	public String contentType;
 
-    /**
+	/**
      * The charset of the emails for this project.
      */
     public String charset;
@@ -177,19 +192,23 @@ public class ExtendedEmailPublisher extends Notifier {
 		return isConfigured();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
-		return _perform(build,launcher,listener);
+	public boolean prebuild(AbstractBuild<?,?> build, BuildListener listener) {
+		return _perform(build,listener,true);
+	}
+
+	@Override
+	public boolean perform(AbstractBuild<?,?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
+		return _perform(build,listener,false);
 	}
 	
-	public <P extends AbstractProject<P,B>,B extends AbstractBuild<P,B>> boolean _perform(B build, Launcher launcher, BuildListener listener) throws InterruptedException {
+	private boolean _perform(AbstractBuild<?,?> build, BuildListener listener, boolean forPreBuild) {
 	   	boolean emailTriggered = false;
 		
 	   	Map<String,EmailTrigger> triggered = new HashMap<String, EmailTrigger>();
 	   	
 		for(EmailTrigger trigger : configuredTriggers) {
-			if(trigger.trigger(build)) {
+			if(trigger.isPreBuild() == forPreBuild && trigger.trigger((AbstractBuild)build)) {
 				String tName = trigger.getDescriptor().getTriggerName();
 				triggered.put(tName,trigger);
 				listener.getLogger().println("Email was triggered for: " + tName);
@@ -217,7 +236,6 @@ public class ExtendedEmailPublisher extends Notifier {
 			return true;
 		}
 		
-		listener.getLogger().println("There are " + triggered.size() + " triggered emails.");
 		for(String triggerName :triggered.keySet()) {
 			listener.getLogger().println("Sending email for trigger: " + triggerName);
 			sendMail(triggered.get(triggerName).getEmail(), build, listener);
@@ -226,17 +244,18 @@ public class ExtendedEmailPublisher extends Notifier {
 		return true;
 	}
 	
-	public <P extends AbstractProject<P,B>,B extends AbstractBuild<P,B>>
-	boolean sendMail(EmailType mailType, B build, BuildListener listener) {
+	private boolean sendMail(EmailType mailType, AbstractBuild<?,?> build, BuildListener listener) {
 		try {
 			MimeMessage msg = createMail(mailType, build, listener);
 			Address[] allRecipients = msg.getAllRecipients();
 			if (allRecipients != null) {
-				StringBuffer buf = new StringBuffer("Sending e-mails to:");
+				StringBuilder buf = new StringBuilder("Sending email to:");
 				for (Address a : allRecipients)
 					buf.append(' ').append(a);
 				listener.getLogger().println(buf);
 				Transport.send(msg);
+				if (build.getAction(MailMessageIdAction.class) == null)
+					build.addAction(new MailMessageIdAction(msg.getMessageID()));
 				return true;
 			} else {
 				listener.getLogger().println("An attempt to send an e-mail"
@@ -250,8 +269,7 @@ public class ExtendedEmailPublisher extends Notifier {
 		return false;
 	}
 
-	private <P extends AbstractProject<P,B>,B extends AbstractBuild<P,B>>
-	MimeMessage createMail(EmailType type, B build, BuildListener listener) throws MessagingException {
+	private MimeMessage createMail(EmailType type, AbstractBuild<?,?> build, BuildListener listener) throws MessagingException {
 		boolean overrideGlobalSettings = ExtendedEmailPublisher.DESCRIPTOR.getOverrideGlobalSettings();
 
 		MimeMessage msg;
@@ -267,32 +285,11 @@ public class ExtendedEmailPublisher extends Notifier {
 		}
 
 		//Set the contents of the email
-		msg.setSentDate(new Date());
-		String subject = new ContentBuilder().transformText(type.getSubject(), this, type, build);
-        String specificCharset = charset;
-        if (specificCharset == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(specificCharset)) {
-            specificCharset = DESCRIPTOR.getDefaultCharset();
-        }
-        if (specificCharset == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(specificCharset)) {
-            msg.setSubject(subject);
-        } else {
-            msg.setSubject(subject, specificCharset);
-        }
-		String text = new ContentBuilder().transformText(type.getBody(), this, type, build);
-		String messageContentType = contentType;
-		// contentType is null if the project was not reconfigured after upgrading.
-		if (messageContentType == null || "default".equals(messageContentType)) {
-			messageContentType = DESCRIPTOR.getDefaultContentType();
-			// The defaultContentType is null if the main Hudson configuration
-			// was not reconfigured after upgrading.
-			if (messageContentType == null) {
-				messageContentType = "text/plain";
-			}
-		}
-        if (specificCharset != null && !DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(specificCharset)) {
-            messageContentType += "; charset=" + specificCharset;
-        }
-		msg.setContent(text, messageContentType);
+        msg.setSentDate(new Date());
+
+        setSubject( type, build, msg );
+
+        setContent( type, build, msg );
 
 		// Get the recipients from the global list of addresses
 		List<InternetAddress> recipientAddresses = new ArrayList<InternetAddress>();
@@ -322,7 +319,7 @@ public class ExtendedEmailPublisher extends Notifier {
 				}
 			}
 		}
-		//Get the list of recipients that are uniquely specified for this type of email 
+		//Get the list of recipients that are uniquely specified for this type of email
 		if (type.getRecipientList() != null && type.getRecipientList().trim().length() > 0) {
 			String[] typeRecipients = type.getRecipientList().split(COMMA_SEPARATED_SPLIT_REGEXP);
 			for (int i = 0; i < typeRecipients.length; i++) {
@@ -331,10 +328,61 @@ public class ExtendedEmailPublisher extends Notifier {
 		}
 		
 		msg.setRecipients(Message.RecipientType.TO, recipientAddresses.toArray(new InternetAddress[recipientAddresses.size()]));
+
+		AbstractBuild<?,?> pb = build.getPreviousBuild();
+		if (pb!=null) {
+			// Send mails as replies until next successful build
+			MailMessageIdAction b = pb.getAction(MailMessageIdAction.class);
+			if(b!=null && pb.getResult()!=Result.SUCCESS) {
+				msg.setHeader("In-Reply-To",b.messageId);
+				msg.setHeader("References",b.messageId);
+			}
+		}
+
 		return msg;
 	}
 
-	private static void addAddress(List<InternetAddress> addresses, String address, BuildListener listener) {
+    private String getCharset() {
+        String cs = charset;
+        if (cs == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(cs)) {
+            cs = DESCRIPTOR.getDefaultCharset();
+        }
+        if (cs == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(cs)) {
+            return CHARSET;
+        } else {
+            return cs;
+        }
+    }
+
+
+    private void setSubject( final EmailType type, final AbstractBuild<?, ?> build, MimeMessage msg )
+        throws MessagingException
+    {
+        String subject = new ContentBuilder().transformText(type.getSubject(), this, type, (AbstractBuild)build);
+        msg.setSubject(subject, getCharset());
+    }
+
+    private void setContent( final EmailType type, final AbstractBuild<?, ?> build, MimeMessage msg )
+        throws MessagingException
+    {
+        final String text = new ContentBuilder().transformText(type.getBody(), this, type, (AbstractBuild)build);
+
+        String messageContentType = contentType;
+        // contentType is null if the project was not reconfigured after upgrading.
+        if (messageContentType == null || "default".equals(messageContentType)) {
+            messageContentType = DESCRIPTOR.getDefaultContentType();
+            // The defaultContentType is null if the main Hudson configuration
+            // was not reconfigured after upgrading.
+            if (messageContentType == null) {
+                messageContentType = "text/plain";
+            }
+        }
+        messageContentType += "; charset=" + getCharset();
+
+        msg.setContent(text, messageContentType);
+    }
+
+    private static void addAddress(List<InternetAddress> addresses, String address, BuildListener listener) {
 		try {
 			addresses.add(new InternetAddress(address));
 		} catch(AddressException ae) {
@@ -408,7 +456,7 @@ public class ExtendedEmailPublisher extends Notifier {
 		 */
 		private String defaultContentType;
 
-        /**
+		/**
          * This is a global default charset (mime type) for emails.
          */
         private String defaultCharset;
@@ -478,7 +526,6 @@ public class ExtendedEmailPublisher extends Notifier {
 				 * and thats done in mail sender, and it would be a bit of a hack to get it all to
 				 * coordinate, and we can make it work through setting mail.smtp properties.
 				 */
-				props.put("mail.smtp.auth","true");
 				if (props.getProperty("mail.smtp.socketFactory.port") == null) {
 					String port = smtpPort==null?"465":smtpPort;
 					props.put("mail.smtp.port", port);
@@ -489,6 +536,8 @@ public class ExtendedEmailPublisher extends Notifier {
 				}
 				props.put("mail.smtp.socketFactory.fallback", "false");
 			}
+			if (smtpAuthUsername!=null)
+				props.put("mail.smtp.auth","true");
 			return Session.getInstance(props,getAuthenticator());
 		}
 		
@@ -537,8 +586,8 @@ public class ExtendedEmailPublisher extends Notifier {
         public String getDefaultCharset() {
 			return defaultCharset;
 		}
-		
-		public String getDefaultSubject() {
+
+        public String getDefaultSubject() {
 			return defaultSubject;
 		}
 		
@@ -565,23 +614,23 @@ public class ExtendedEmailPublisher extends Notifier {
 		@Override
 		public Publisher newInstance(StaplerRequest req, JSONObject formData) throws hudson.model.Descriptor.FormException {
 			// Save the recipient lists
-			String listRecipients = req.getParameter("recipientlist_recipients");
+			String listRecipients = formData.getString("recipientlist_recipients");
 			
 			// Save configuration for each trigger type
 			ExtendedEmailPublisher m = new ExtendedEmailPublisher();
 			m.recipientList = listRecipients;
-			m.contentType = req.getParameter("project_content_type");
-            m.charset = req.getParameter("project_charset");
-			m.defaultSubject = req.getParameter("project_default_subject");
-			m.defaultContent = req.getParameter("project_default_content");
-			m.defaultContentIsScript = req.getParameter("project_default_content_is_script")!=null;
+			m.contentType = formData.getString("project_content_type");
+			m.charset = formData.getString("project_charset");
+            m.defaultSubject = formData.getString("project_default_subject");
+			m.defaultContent = formData.getString("project_default_content");
+            m.defaultContentIsScript = formData.optBoolean("project_default_content_is_script");
 			m.configuredTriggers = new ArrayList<EmailTrigger>();
-            m.buildForTesting = req.getParameter("project_build_for_testing");
-
+            m.buildForTesting = req.getParameter("project_build_for_testing");           
+            
 			// Create a new email trigger for each one that is configured
 			for (String mailerId : EMAIL_TRIGGER_TYPE_MAP.keySet()) {
-				EmailType type = createMailType(req, mailerId);
-				if (type != null) {
+				if("true".equalsIgnoreCase(formData.optString("mailer_" + mailerId + "_configured"))) {
+					EmailType type = createMailType(formData, mailerId);
 					EmailTrigger trigger = EMAIL_TRIGGER_TYPE_MAP.get(mailerId).getNewInstance(type);
 					m.configuredTriggers.add(trigger);
 				}
@@ -591,21 +640,16 @@ public class ExtendedEmailPublisher extends Notifier {
 			return m;
 		}
 		
-		private EmailType createMailType(StaplerRequest req, String mailType) {
-			if(req.getParameter("mailer." + mailType + ".configured") == null)
-				return null;
-			if(!req.getParameter("mailer." + mailType + ".configured").equalsIgnoreCase("true"))
-				return null;
-			
+		private EmailType createMailType(JSONObject formData, String mailType) {
 			EmailType m = new EmailType();
-			String prefix = "mailer." + mailType + ".";
-			m.setSubject(req.getParameter(prefix + "subject"));
-			m.setBody(req.getParameter(prefix + "body"));
-			m.setRecipientList(req.getParameter(prefix + "recipientList"));
-			m.setSendToRecipientList(req.getParameter(prefix + "sendToRecipientList")!=null);
-			m.setSendToDevelopers(req.getParameter(prefix + "sendToDevelopers")!=null);
-			m.setIncludeCulprits(req.getParameter(prefix + "includeCulprits")!=null);
-			m.setScript(req.getParameter(prefix + "script")!=null);
+			String prefix = "mailer_" + mailType + '_';
+			m.setSubject(formData.getString(prefix + "subject"));
+			m.setBody(formData.getString(prefix + "body"));
+			m.setRecipientList(formData.getString(prefix + "recipientList"));
+			m.setSendToRecipientList(formData.optBoolean(prefix + "sendToRecipientList"));
+			m.setSendToDevelopers(formData.optBoolean(prefix + "sendToDevelopers"));
+			m.setIncludeCulprits(formData.optBoolean(prefix + "includeCulprits"));
+            m.setScript(formData.optBoolean(prefix + "script"));
 			return m;
 		}
 		
@@ -667,7 +711,7 @@ public class ExtendedEmailPublisher extends Notifier {
 		}
 		
 		private String nullify(String v) {
-			if(v!=null && v.length()==0)	
+			if(v!=null && v.length()==0)
 				v=null;
 			return v;
 		}
