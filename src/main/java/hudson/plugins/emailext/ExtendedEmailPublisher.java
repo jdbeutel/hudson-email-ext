@@ -42,19 +42,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.nio.charset.Charset;
 
-import javax.mail.Address;
-import javax.mail.Authenticator;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.PasswordAuthentication;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.AddressException;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
-import javax.servlet.ServletException;
-
-import net.sf.json.JSONObject;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
@@ -342,12 +329,16 @@ public class ExtendedEmailPublisher extends Notifier {
 		return msg;
 	}
 
+    private static boolean isNullOrBlank(String s) { // or, add dependency on commons-lang StringUtils instead?
+        return s == null || s.trim().length() == 0;
+    }
+
     private String getCharset() {
         String cs = charset;
-        if (cs == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(cs)) {
+        if (isNullOrBlank(cs) || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(cs)) {
             cs = DESCRIPTOR.getDefaultCharset();
         }
-        if (cs == null || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(cs)) {
+        if (isNullOrBlank(cs) || DEFAULT_CHARSET_SENTINAL.equalsIgnoreCase(cs)) {
             return CHARSET;
         } else {
             return cs;
@@ -366,7 +357,10 @@ public class ExtendedEmailPublisher extends Notifier {
         throws MessagingException
     {
         final String text = new ContentBuilder().transformText(type.getBody(), this, type, (AbstractBuild)build);
+        msg.setContent(text, getContentType());
+    }
 
+    private String getContentType() {
         String messageContentType = contentType;
         // contentType is null if the project was not reconfigured after upgrading.
         if (messageContentType == null || "default".equals(messageContentType)) {
@@ -378,8 +372,7 @@ public class ExtendedEmailPublisher extends Notifier {
             }
         }
         messageContentType += "; charset=" + getCharset();
-
-        msg.setContent(text, messageContentType);
+        return messageContentType;
     }
 
     private static void addAddress(List<InternetAddress> addresses, String address, BuildListener listener) {
@@ -624,9 +617,9 @@ public class ExtendedEmailPublisher extends Notifier {
             m.defaultSubject = formData.getString("project_default_subject");
 			m.defaultContent = formData.getString("project_default_content");
             m.defaultContentIsScript = formData.optBoolean("project_default_content_is_script");
-			m.configuredTriggers = new ArrayList<EmailTrigger>();
-            m.buildForTesting = req.getParameter("project_build_for_testing");           
-            
+            m.buildForTesting = req.getParameter("project_build_for_testing");
+            m.configuredTriggers = new ArrayList<EmailTrigger>();
+
 			// Create a new email trigger for each one that is configured
 			for (String mailerId : EMAIL_TRIGGER_TYPE_MAP.keySet()) {
 				if("true".equalsIgnoreCase(formData.optString("mailer_" + mailerId + "_configured"))) {
@@ -635,8 +628,6 @@ public class ExtendedEmailPublisher extends Notifier {
 					m.configuredTriggers.add(trigger);
 				}
 			}
-			
-			req.bindParameters(m, "ext_mailer_");
 			return m;
 		}
 		
@@ -772,69 +763,71 @@ public class ExtendedEmailPublisher extends Notifier {
             }
         }
 
-        private interface TransformStrategy {
-            String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild build);
+        // validateButton in config.jelly
+        public FormValidation doTestAgainstBuild(StaplerRequest req) throws IOException, ServletException {
+            ExtendedEmailPublisher publisher = new ExtendedEmailPublisher();
+            publisher.contentType = req.getParameter("project_content_type");
+            publisher.charset = req.getParameter("project_charset");
+            publisher.defaultSubject = req.getParameter("project_default_subject");
+            publisher.defaultContent = req.getParameter("project_default_content");
+            publisher.defaultContentIsScript = req.getParameter("project_default_content_is_script") != null;
+            publisher.buildForTesting = req.getParameter("project_build_for_testing");
+            return doTestAgainstBuild(publisher, false, req);
         }
 
-        public FormValidation doTestAgainstBuild(StaplerRequest req, @QueryParameter("project_build_for_testing") String buildForTesting) throws IOException {
-            TransformStrategy strategy = new TransformStrategy() {
-                public String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild build) {
-                    return new ContentBuilder().transformText(origText, publisher, type, build);
-                }
-            };
-            return doTestAgainstBuild(strategy, PROJECT_DEFAULT_SUBJECT_TEXT, PROJECT_DEFAULT_BODY_TEXT, req, buildForTesting);
+        // validateButton in global.jelly
+        public FormValidation doGlobalTestAgainstBuild(StaplerRequest req) throws IOException, ServletException {
+            ExtendedEmailPublisher publisher = new ExtendedEmailPublisher();
+            // testing at project level because the corresponding globals are static
+            publisher.contentType = req.getParameter("ext_mailer_default_content_type");
+            publisher.charset = req.getParameter("ext_mailer_default_charset");
+            publisher.defaultSubject = req.getParameter("ext_mailer_default_subject");
+            publisher.defaultContent = req.getParameter("ext_mailer_default_body");
+            publisher.defaultContentIsScript = req.getParameter("ext_mailer_default_is_script") != null;
+            publisher.buildForTesting = req.getParameter("ext_mailer_default_build_for_testing");
+            return doTestAgainstBuild(publisher, true, req);
         }
 
-        public FormValidation doGlobalTestAgainstBuild(StaplerRequest req,
-                                                       @QueryParameter("ext_mailer_default_build_for_testing") String buildForTesting,
-                                                       @QueryParameter("ext_mailer_default_is_script") final boolean globalIsScript,
-                                                       @QueryParameter("ext_mailer_default_subject") String globalSubject,
-                                                       @QueryParameter("ext_mailer_default_body") String globalBody
-        ) throws IOException {
-            TransformStrategy strategy = new TransformStrategy() {
-                public String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild build) {
-                    // This works around ContentBuilder.transformText()'s static access of the global subject and body,
-                    // which has not been updated before testing.
-                    return new ContentBuilder().transformResolvedText(globalIsScript, origText, publisher, type, build);
-                }
-            };
-            return doTestAgainstBuild(strategy, globalSubject, globalBody, req, buildForTesting);
-        }
-
+        // for iframe callback
         private String testedEmailText;
+        private String testedEmailContentType;
 
-        private FormValidation doTestAgainstBuild(TransformStrategy strategy,
-                                                  String originalSubject,
-                                                  String originalBody,
-                                                  StaplerRequest req,
-                                                  String buildForTesting
-        ) throws IOException {
-            buildForTesting = nullify(buildForTesting);
-            if (buildForTesting == null) {
-                return FormValidation.error("need to configure a build for testing");
+        private FormValidation doTestAgainstBuild(ExtendedEmailPublisher publisher,
+                                                  boolean globallyResolved,
+                                                  StaplerRequest req
+        ) throws FormValidation {
+            if (nullify(publisher.buildForTesting) == null) {
+                return FormValidation.error("need to specify a build for testing");
             }
-            try {
-                AbstractBuild build = getBuildForTesting(buildForTesting);
-                ExtendedEmailPublisher publisher = (ExtendedEmailPublisher) newInstance(req, null);
-                EmailType type = new EmailType();
-                type.setBody(ExtendedEmailPublisher.PROJECT_DEFAULT_BODY_TEXT);
-                type.setSubject(ExtendedEmailPublisher.PROJECT_DEFAULT_SUBJECT_TEXT);
-                String subject = strategy.transformText(originalSubject, publisher, type, build);
-                testedEmailText = strategy.transformText(originalBody, publisher, type, build);
-                String resultUrl = req.getRequestURI().replace("testAgainstBuild", "testedEmailText")
-                        .replace("globalTestAgainstBuild", "testedEmailText"); // todo: some better hack
-                return FormValidation.okWithMarkup("resulting subject: " + subject
-                        + "<br/>resulting body:<br/> <iframe width='100%' height='400px' src='" + resultUrl + "'/>");
+            testedEmailContentType = publisher.getContentType();
+            AbstractBuild build = getBuildForTesting(publisher.buildForTesting);
+            String subject;
+            if (globallyResolved) {
+                // Work around ContentBuilder.transformText()'s static access of the global subject and body,
+                // which has not been updated before testing.
+                subject = transformResolvedText(publisher.defaultSubject, publisher, build);
+                testedEmailText = transformResolvedText(publisher.defaultContent, publisher, build);
+            } else {
+                subject = transformText(publisher.defaultSubject, publisher, build);
+                testedEmailText = transformText(publisher.defaultContent, publisher, build);
             }
-            catch (FormValidation e) {
-                return e;
-            } catch (FormException e) {
-                return FormValidation.error(e.getMessage());
-            }
+            String resultUrl = req.getRequestURI().replace("testAgainstBuild", "testedEmailText")
+                    .replace("globalTestAgainstBuild", "testedEmailText"); // todo: something less hacky?
+            return FormValidation.okWithMarkup("resulting subject: " + subject // todo: subject charset?
+                    + "<br/>resulting body:<br/> <iframe width='100%' height='400px' src='" + resultUrl + "'/>");
         }
 
+        private static String transformResolvedText(String text, ExtendedEmailPublisher publisher, AbstractBuild build) {
+            return new ContentBuilder().transformResolvedText(publisher.defaultContentIsScript, text, publisher, new EmailType(), build);
+        }
+
+        private static String transformText(String text, ExtendedEmailPublisher publisher, AbstractBuild build) {
+            return new ContentBuilder().transformText(text, publisher, new EmailType(), build);
+        }
+
+        // callback from iframe
         public void doTestedEmailText(StaplerRequest req, StaplerResponse rsp) throws IOException {
-            rsp.setContentType("text/html");
+            rsp.setContentType(testedEmailContentType);
             rsp.getWriter().write(testedEmailText);
         }
 
@@ -871,7 +864,4 @@ public class ExtendedEmailPublisher extends Notifier {
             return build;
         }
 	}
-
-
-
 }
