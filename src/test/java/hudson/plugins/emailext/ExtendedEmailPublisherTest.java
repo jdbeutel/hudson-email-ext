@@ -254,9 +254,11 @@ public class ExtendedEmailPublisherTest
     {
         JSONObject form = new JSONObject();
         form.put( "project_content_type", "default" );
+        form.put( "project_charset", "default" );
         form.put( "recipientlist_recipients", "ashlux@gmail.com" );
         form.put( "project_default_subject", "Make millions in Nigeria" );
         form.put( "project_default_content", "Give me a $1000 check and I'll mail you back $5000!!!" );
+        form.put( "project_build_for_testing", "" );
 
         publisher = (ExtendedEmailPublisher) ExtendedEmailPublisher.DESCRIPTOR.newInstance( null, form );
 

@@ -1,6 +1,7 @@
 package hudson.plugins.emailext.plugins;
 
 import hudson.model.AbstractBuild;
+import hudson.plugins.emailext.EmailType;
 import hudson.plugins.emailext.ExtendedEmailPublisher;
 import org.jvnet.hudson.test.HudsonTestCase;
 
@@ -146,18 +147,18 @@ public class ContentBuilderTest
     public void testTransformText_shouldExpand_$PROJECT_DEFAULT_CONTENT()
         throws IOException, InterruptedException
     {
-        assertEquals(publisher.defaultContent, new ContentBuilder().transformText( "$PROJECT_DEFAULT_CONTENT", publisher, null,
+        assertEquals(publisher.defaultContent, new ContentBuilder().transformText( "$PROJECT_DEFAULT_CONTENT", publisher, new EmailType(),
                                                        mock( AbstractBuild.class ) ));
-        assertEquals(publisher.defaultContent, new ContentBuilder().transformText( "${PROJECT_DEFAULT_CONTENT}", publisher, null,
+        assertEquals(publisher.defaultContent, new ContentBuilder().transformText( "${PROJECT_DEFAULT_CONTENT}", publisher, new EmailType(),
                                                        mock( AbstractBuild.class ) ));
     }
 
     public void testTransformText_shouldExpand_$PROJECT_DEFAULT_SUBJECT()
         throws IOException, InterruptedException
     {
-        assertEquals(publisher.defaultSubject, new ContentBuilder().transformText( "$PROJECT_DEFAULT_SUBJECT", publisher, null,
+        assertEquals(publisher.defaultSubject, new ContentBuilder().transformText( "$PROJECT_DEFAULT_SUBJECT", publisher, new EmailType(),
                                                        mock( AbstractBuild.class ) ));
-        assertEquals(publisher.defaultSubject, new ContentBuilder().transformText( "${PROJECT_DEFAULT_SUBJECT}", publisher, null,
+        assertEquals(publisher.defaultSubject, new ContentBuilder().transformText( "${PROJECT_DEFAULT_SUBJECT}", publisher, new EmailType(),
                                                        mock( AbstractBuild.class ) ));
     }
 
@@ -165,10 +166,10 @@ public class ContentBuilderTest
         throws IOException, InterruptedException
     {
         assertEquals( ExtendedEmailPublisher.DESCRIPTOR.getDefaultBody(),
-                      new ContentBuilder().transformText( "$DEFAULT_CONTENT", publisher, null,
+                      new ContentBuilder().transformText( "$DEFAULT_CONTENT", publisher, new EmailType(),
                                                           mock( AbstractBuild.class ) ) );
         assertEquals( ExtendedEmailPublisher.DESCRIPTOR.getDefaultBody(),
-                      new ContentBuilder().transformText( "${DEFAULT_CONTENT}", publisher, null,
+                      new ContentBuilder().transformText( "${DEFAULT_CONTENT}", publisher, new EmailType(),
                                                           mock( AbstractBuild.class ) ) );
     }
 
@@ -176,10 +177,10 @@ public class ContentBuilderTest
         throws IOException, InterruptedException
     {
         assertEquals( ExtendedEmailPublisher.DESCRIPTOR.getDefaultSubject(),
-                      new ContentBuilder().transformText( "$DEFAULT_SUBJECT", publisher, null,
+                      new ContentBuilder().transformText( "$DEFAULT_SUBJECT", publisher, new EmailType(),
                                                           mock( AbstractBuild.class ) ) );
         assertEquals( ExtendedEmailPublisher.DESCRIPTOR.getDefaultSubject(),
-                      new ContentBuilder().transformText( "${DEFAULT_SUBJECT}", publisher, null,
+                      new ContentBuilder().transformText( "${DEFAULT_SUBJECT}", publisher, new EmailType(),
                                                           mock( AbstractBuild.class ) ) );
     }
 }

@@ -616,7 +616,7 @@ public class ExtendedEmailPublisher extends Notifier {
             m.defaultSubject = formData.getString("project_default_subject");
 			m.defaultContent = formData.getString("project_default_content");
             m.defaultContentIsScript = formData.optBoolean("project_default_content_is_script");
-            m.buildForTesting = req.getParameter("project_build_for_testing");
+            m.buildForTesting = formData.getString("project_build_for_testing");
             m.configuredTriggers = new ArrayList<EmailTrigger>();
 
 			// Create a new email trigger for each one that is configured
