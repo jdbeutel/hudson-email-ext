@@ -125,7 +125,7 @@
 				</f:entry>
 				<f:entry title="Content is Script"
 					help="${rootURL}/plugin/email-ext/help/projectConfig/mailType/script.html">
-					<f:checkbox name="mailer.${mailType}.script"
+					<f:checkbox name="mailer_${mailType}_script"
 						checked="${mailTypeObj.script}" />
 				</f:entry>
 			</table>

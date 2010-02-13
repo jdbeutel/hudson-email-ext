@@ -345,7 +345,6 @@ public class ExtendedEmailPublisher extends Notifier {
         }
     }
 
-
     private void setSubject( final EmailType type, final AbstractBuild<?, ?> build, MimeMessage msg )
         throws MessagingException
     {
