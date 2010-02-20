@@ -769,7 +769,7 @@ public class ExtendedEmailPublisher extends Notifier {
             publisher.charset = req.getParameter("project_charset");
             publisher.defaultSubject = req.getParameter("project_default_subject");
             publisher.defaultContent = req.getParameter("project_default_content");
-            publisher.defaultContentIsScript = req.getParameter("project_default_content_is_script") != null;
+            publisher.defaultContentIsScript = Boolean.valueOf(req.getParameter("project_default_content_is_script"));
             publisher.buildForTesting = req.getParameter("project_build_for_testing");
             return doTestAgainstBuild(publisher, false, req);
         }
@@ -782,7 +782,7 @@ public class ExtendedEmailPublisher extends Notifier {
             publisher.charset = req.getParameter("ext_mailer_default_charset");
             publisher.defaultSubject = req.getParameter("ext_mailer_default_subject");
             publisher.defaultContent = req.getParameter("ext_mailer_default_body");
-            publisher.defaultContentIsScript = req.getParameter("ext_mailer_default_is_script") != null;
+            publisher.defaultContentIsScript = Boolean.valueOf(req.getParameter("ext_mailer_default_is_script"));
             publisher.buildForTesting = req.getParameter("ext_mailer_default_build_for_testing");
             return doTestAgainstBuild(publisher, true, req);
         }
@@ -807,8 +807,9 @@ public class ExtendedEmailPublisher extends Notifier {
                 subject = transformResolvedText(publisher.defaultSubject, publisher, build);
                 testedEmailText = transformResolvedText(publisher.defaultContent, publisher, build);
             } else {
-                subject = transformText(publisher.defaultSubject, publisher, build);
-                testedEmailText = transformText(publisher.defaultContent, publisher, build);
+                // use default tokens to induce resolution for project-level script flag
+                subject = transformText(ExtendedEmailPublisher.PROJECT_DEFAULT_SUBJECT_TEXT, publisher, build);
+                testedEmailText = transformText(ExtendedEmailPublisher.PROJECT_DEFAULT_BODY_TEXT, publisher, build);
             }
             String resultUrl = req.getRequestURI().replace("testAgainstBuild", "testedEmailText")
                     .replace("globalTestAgainstBuild", "testedEmailText"); // todo: something less hacky?
