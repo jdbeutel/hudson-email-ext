@@ -3,7 +3,7 @@
   <parent>
     <groupId>org.jvnet.hudson.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>1.345</version>
+    <version>1.353</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -22,6 +22,11 @@
     <developer>
       <id>kdsweeney</id>
       <name>Kyle Sweeney</name>
+    </developer>
+    <developer>
+      <id>krwalker</id>
+      <name>K. R. Walker</name>
+      <email>krwalker@stellarscience.com</email>
     </developer>
   </developers>
 
