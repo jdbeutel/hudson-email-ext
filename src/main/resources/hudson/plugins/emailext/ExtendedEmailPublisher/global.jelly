@@ -15,7 +15,7 @@
 	    <f:entry title="System Admin E-mail Address"
 	             help="/descriptor/hudson.tasks.Mailer/help/adminAddress">
 	      <f:textbox name="ext_mailer_admin_address" value="${descriptor.adminAddress}"
-	          checkUrl="'${rootURL}/publisher/Mailer/addressCheck?value='+encode(this.value)"/>
+	          checkUrl="'${rootURL}/publisher/Mailer/addressCheck?value='+toValue(this)"/>
 	    </f:entry>
 	    <f:entry title="Hudson URL"
 	             help="/descriptor/hudson.tasks.Mailer/help/url">
@@ -58,10 +58,10 @@
         </select>
       </f:entry>
       <f:entry title="Default Charset"
-               help="${rootURL}/plugin/email-ext/help/globalConfig/defaultCharset.html">
+               help="/plugin/email-ext/help/globalConfig/defaultCharset.html">
           <input class="setting-input validated" name="ext_mailer_default_charset"
                  type="text" value="${descriptor.defaultCharset}"
-                 checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+encode(this.value)"/>
+                 checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+toValue(this)"/>
       </f:entry>
       <f:entry title="Default Subject"
                help="/plugin/email-ext/help/globalConfig/defaultSubject.html">
@@ -75,15 +75,15 @@
                     value="${descriptor.defaultBody}"/>
       </f:entry>
       <f:entry title="Default is Script"
-               help="${rootURL}/plugin/email-ext/help/globalConfig/defaultIsScript.html">
+               help="/plugin/email-ext/help/globalConfig/defaultIsScript.html">
           <f:checkbox name="ext_mailer_default_is_script" checked="${descriptor.defaultIsScript}" />
       </f:entry>
 
       <f:entry title="Build for Testing"
-               help="${rootURL}/plugin/email-ext/help/globalConfig/buildForTesting.html">
+               help="/plugin/email-ext/help/globalConfig/buildForTesting.html">
           <input class="setting-input validated" name="ext_mailer_default_build_for_testing"
                  type="text" value="${descriptor.defaultBuildForTesting}"
-                 checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/buildForTestingCheck?value='+encode(this.value)"/>
+                 checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/buildForTestingCheck?value='+toValue(this)"/>
       </f:entry>
 
       <f:validateButton  title="${%Test Against Build}" method="globalTestAgainstBuild"

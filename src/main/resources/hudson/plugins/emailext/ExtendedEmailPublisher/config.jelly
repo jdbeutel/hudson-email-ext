@@ -19,7 +19,7 @@
              help="/plugin/email-ext/help/projectConfig/globalRecipientList.html">
 	    <input class="setting-input validated" name="recipientlist_recipients"
             type="text" value="${instance.recipientList}"
-            checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/recipientListRecipientsCheck?value='+encode(this.value)"/>
+            checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/recipientListRecipientsCheck?value='+toValue(this)"/>
     </f:entry>
     
 	<!-- This is the content type for the emails. -->
@@ -40,20 +40,20 @@
     </f:entry>
 
     <f:entry title="Charset"
-             help="${rootURL}/plugin/email-ext/help/projectConfig/charset.html">
+             help="/plugin/email-ext/help/projectConfig/charset.html">
         <!--input class="setting-input validated" name="project_charset"
                type="text" value="${instance.charset}"
-               checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+encode(this.value)"/-->
+               checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+toValue(this)"/-->
         <j:choose>
             <j:when test="${instance.configured}">
                 <input class="setting-input validated" name="project_charset"
                        type="text" value="${instance.charset}"
-                       checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+encode(this.value)"/>
+                       checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+toValue(this)"/>
             </j:when>
             <j:otherwise>
                 <input class="setting-input validated" name="project_charset"
                        type="text" value="default"
-                       checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+encode(this.value)"/>
+                       checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/charsetCheck?value='+toValue(this)"/>
             </j:otherwise>
         </j:choose>
     </f:entry>
@@ -74,7 +74,7 @@
     </f:entry>
 
     <f:entry title="Default Content is Script"
-	     help="${rootURL}/plugin/email-ext/help/projectConfig/mailType/script.html">
+	     help="/plugin/email-ext/help/projectConfig/mailType/script.html">
 	<j:choose>
 	    <j:when test="${instance.configured}">
 		<f:checkbox name="project_default_content_is_script"
@@ -121,10 +121,10 @@
 	</tr>
 
     <f:entry title="Build for Testing"
-             help="${rootURL}/plugin/email-ext/help/projectConfig/buildForTesting.html">
+             help="/plugin/email-ext/help/projectConfig/buildForTesting.html">
         <input class="setting-input validated" name="project_build_for_testing"
                 type="text" value="${instance.buildForTesting}"
-                checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/buildForTestingCheck?value='+encode(this.value)"/>
+                checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/buildForTestingCheck?value='+toValue(this)"/>
     </f:entry>
 
     <f:validateButton  title="${%Test Against Build}" method="testAgainstBuild" with="project_build_for_testing,project_default_content_is_script,project_default_content,project_default_subject,project_charset,project_content_type,recipientlist_recipients" />
