@@ -195,7 +195,7 @@ public class ExtendedEmailPublisher extends Notifier {
 	   	Map<String,EmailTrigger> triggered = new HashMap<String, EmailTrigger>();
 	   	
 		for(EmailTrigger trigger : configuredTriggers) {
-			if(trigger.isPreBuild() == forPreBuild && trigger.trigger((AbstractBuild)build)) {
+			if(trigger.isPreBuild() == forPreBuild && trigger.trigger(build)) {
 				String tName = trigger.getDescriptor().getTriggerName();
 				triggered.put(tName,trigger);
 				listener.getLogger().println("Email was triggered for: " + tName);
@@ -353,14 +353,14 @@ public class ExtendedEmailPublisher extends Notifier {
     private void setSubject( final EmailType type, final AbstractBuild<?, ?> build, MimeMessage msg )
         throws MessagingException
     {
-        String subject = new ContentBuilder().transformText(type.getSubject(), this, type, (AbstractBuild)build);
+        String subject = new ContentBuilder().transformText(type.getSubject(), this, type, build);
         msg.setSubject(subject, getCharset());
     }
 
     private void setContent( final EmailType type, final AbstractBuild<?, ?> build, MimeMessage msg )
         throws MessagingException
     {
-        final String text = new ContentBuilder().transformText(type.getBody(), this, type, (AbstractBuild)build);
+        final String text = new ContentBuilder().transformText(type.getBody(), this, type, build);
         msg.setContent(text, getContentType());
     }
 

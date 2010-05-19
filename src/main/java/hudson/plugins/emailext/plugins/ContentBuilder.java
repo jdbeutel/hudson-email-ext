@@ -3,7 +3,6 @@ package hudson.plugins.emailext.plugins;
 import groovy.text.SimpleTemplateEngine;
 import groovy.text.Template;
 import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
 import hudson.plugins.emailext.EmailExtException;
 import hudson.plugins.emailext.EmailType;
 import hudson.plugins.emailext.ExtendedEmailPublisher;
@@ -61,8 +60,7 @@ public class ContentBuilder {
 		return EMAIL_CONTENT_TYPE_MAP.values();
 	}
 	
-	public <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
-	String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, B build) {
+	public String transformText(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<?,?> build) {
         boolean isScript = type.isScript();
 		String projectlyResolvedText = origText.replaceAll(PROJECT_DEFAULT_BODY, Matcher.quoteReplacement(publisher.defaultContent))
 		 						 .replaceAll(PROJECT_DEFAULT_SUBJECT, Matcher.quoteReplacement(publisher.defaultSubject));
@@ -76,14 +74,12 @@ public class ContentBuilder {
     }
 
     // exposed for testing
-    public <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
-    String transformResolvedText(boolean isScript, String text, ExtendedEmailPublisher publisher, EmailType type, B build) {
+    public String transformResolvedText(boolean isScript, String text, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<?,?> build) {
 		return isScript ? transformUsingScript(text, publisher, type, build)
 		                       : replaceTokensWithContent(text, publisher, type, build);
 	}
 	
-	private static <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
-	String replaceTokensWithContent(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<P, B> build) {
+	private static String replaceTokensWithContent(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<?, ?> build) {
 		StringBuffer sb = new StringBuffer();
 		Tokenizer tokenizer = new Tokenizer(origText);
 
@@ -205,8 +201,7 @@ public class ContentBuilder {
 		
 	}
 
-	private <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
-	String transformUsingScript(String origText, ExtendedEmailPublisher publisher, EmailType type, B build) {
+	private String transformUsingScript(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<?,?> build) {
 		SimpleTemplateEngine engine = new SimpleTemplateEngine();
 		Template template = null;
 		try {
