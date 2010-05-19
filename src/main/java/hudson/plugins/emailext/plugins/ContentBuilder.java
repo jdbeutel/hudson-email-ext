@@ -3,6 +3,7 @@ package hudson.plugins.emailext.plugins;
 import groovy.text.SimpleTemplateEngine;
 import groovy.text.Template;
 import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
 import hudson.plugins.emailext.EmailExtException;
 import hudson.plugins.emailext.EmailType;
 import hudson.plugins.emailext.ExtendedEmailPublisher;
@@ -78,8 +79,9 @@ public class ContentBuilder {
 		return isScript ? transformUsingScript(text, publisher, type, build)
 		                       : replaceTokensWithContent(text, publisher, type, build);
 	}
-	
-	private static String replaceTokensWithContent(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<?, ?> build) {
+
+	private static <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
+	String replaceTokensWithContent(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<P, B> build) {
 		StringBuffer sb = new StringBuffer();
 		Tokenizer tokenizer = new Tokenizer(origText);
 
@@ -201,7 +203,8 @@ public class ContentBuilder {
 		
 	}
 
-	private String transformUsingScript(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<?,?> build) {
+    private static <P extends AbstractProject<P, B>, B extends AbstractBuild<P, B>>
+	String transformUsingScript(String origText, ExtendedEmailPublisher publisher, EmailType type, AbstractBuild<P,B> build) {
 		SimpleTemplateEngine engine = new SimpleTemplateEngine();
 		Template template = null;
 		try {
