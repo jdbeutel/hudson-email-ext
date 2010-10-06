@@ -1,6 +1,6 @@
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" 
-         xmlns:d="jelly:define" xmlns:l="/lib/layout" 
-         xmlns:t="/lib/hudson" xmlns:f="/lib/form" 
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler"
+         xmlns:d="jelly:define" xmlns:l="/lib/layout"
+         xmlns:t="/lib/hudson" xmlns:f="/lib/form"
          xmlns:m="/hudson/plugins/emailext/tags">
     <!--
         This script defines the view for the extended email plugin.
@@ -21,7 +21,7 @@
             type="text" value="${instance.recipientList}"
             checkUrl="'${rootURL}/publisher/ExtendedEmailPublisher/recipientListRecipientsCheck?value='+toValue(this)"/>
     </f:entry>
-    
+
 	<!-- This is the content type for the emails. -->
     <f:entry title="Content Type"
              help="/plugin/email-ext/help/projectConfig/contentType.html">
@@ -104,7 +104,7 @@
 			</j:otherwise>
 		</j:choose>
     </f:entry>
-    
+
 	<!-- This is the help section.  It displays a bunch of dynamic help for all content tokens. -->
 	<tr>
 		<td></td>
@@ -129,11 +129,11 @@
 
     <f:validateButton  title="${%Test Against Build}" method="testAgainstBuild" with="project_build_for_testing,project_default_content_is_script,project_default_content,project_default_subject,project_charset,project_content_type,recipientlist_recipients" />
 
-	<!-- Configure advanced properties like per-build-result status email contents, 
+	<!-- Configure advanced properties like per-build-result status email contents,
 		 whether or not to send email to developers who made changes, and whether or
 		 not to send email to the global list of devs-->
-	<f:advanced> 
-		
+	<f:advanced>
+
 		<tr>
 			<td></td>
 			<td colspan="3" style="margin-left:10px">
@@ -173,23 +173,23 @@
 						</td>
 						<td/>
 					</tr>
-   					
+
    					<j:forEach var="trigger" items="${instance.configuredTriggers}">
-						<m:mailtype title="${trigger.descriptor.triggerName}" 
+						<m:mailtype title="${trigger.descriptor.triggerName}"
 										mailType="${trigger.descriptor.mailerId}"
-					     				mailTypeObj="${trigger.email}" 
-					     				sendToList="${trigger.defaultSendToList}" 
-					     				sendToDevs="${trigger.defaultSendToDevs}" 
+					     				mailTypeObj="${trigger.email}"
+					     				sendToList="${trigger.defaultSendToList}"
+					     				sendToDevs="${trigger.defaultSendToDevs}"
 					     				includeCulps="${trigger.defaultIncludeCulps}"
 					     				trigger="${trigger}"
 					     				configured="${true}"
 					     				secId="${secId}">
 					    </m:mailtype>
 					</j:forEach>
-					
+
 					<j:choose>
 						<j:when test="${instance==null}">
-							<j:invokeStatic var="nonConfigTriggers" method="getTriggersForNonConfiguredInstance" className="hudson.plugins.emailext.ExtendedEmailPublisher"/>  
+							<j:invokeStatic var="nonConfigTriggers" method="getTriggersForNonConfiguredInstance" className="hudson.plugins.emailext.ExtendedEmailPublisher"/>
 						</j:when>
 						<j:otherwise>
 							<j:set var="nonConfigTriggers" value="${instance.nonConfiguredTriggers}" />
@@ -226,19 +226,19 @@
 					</tr>
 				  </tbody>
 				</table>
-				
+
 				<!-- This table is for non-configured types.  We'll do some dom manipulation
 					 to make sure that when a trigger is selected from the dropdown that it
-					 is added to the configured table.  Also, if a configured trigger is 
+					 is added to the configured table.  Also, if a configured trigger is
 					 deleted from the configured table, we'll add it here. -->
 				<table style="display:none">
 					<tbody id="${secId}non-configured-email-triggers" >
 						<j:forEach var="trigger" items="${nonConfigTriggers}">
-							<m:mailtype title="${trigger.descriptor.triggerName}" 
+							<m:mailtype title="${trigger.descriptor.triggerName}"
 											mailType="${trigger.descriptor.mailerId}"
-						     				mailTypeObj="${trigger.email}" 
-						     				sendToList="${trigger.defaultSendToList}" 
-						     				sendToDevs="${trigger.defaultSendToDevs}" 
+						     				mailTypeObj="${trigger.email}"
+						     				sendToList="${trigger.defaultSendToList}"
+						     				sendToDevs="${trigger.defaultSendToDevs}"
 						     				includeCulps="${trigger.defaultIncludeCulps}"
 						     				trigger="${trigger}"
 						     				configured="${false}"
@@ -247,8 +247,8 @@
 						</j:forEach>
 					</tbody>
 				</table>
-				
-				<!-- This select element is used to hold option elements for the configured mailers. 
+
+				<!-- This select element is used to hold option elements for the configured mailers.
 				     We'll do some dom manipulation to make sure that configured triggers' select
 				     option elements are placed here so that they are not shown.-->
 				<select style="display:none" id="${secId}configured-options">

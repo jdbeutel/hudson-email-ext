@@ -3,21 +3,11 @@ package hudson.plugins.emailext.plugins.content;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Result;
-import hudson.plugins.emailext.EmailType;
-import hudson.plugins.emailext.ExtendedEmailPublisher;
-import hudson.plugins.emailext.Util;
-import hudson.plugins.emailext.Util.PrintfSpec;
-import hudson.plugins.emailext.plugins.EmailContent;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-public class ChangesSinceLastSuccessfulBuildContent
+public class ChangesSinceLastUnstableBuildContent
     extends AbstractChangesSinceContent
 {
-    private static final String TOKEN = "CHANGES_SINCE_LAST_SUCCESS";
+    private static final String TOKEN = "CHANGES_SINCE_LAST_UNSTABLE";
 
     private static final String FORMAT_DEFAULT_VALUE = "Changes for Build #%n\\n%c\\n";
 
@@ -35,7 +25,7 @@ public class ChangesSinceLastSuccessfulBuildContent
     @Override
     public String getShortHelpDescription()
     {
-        return "Displays the changes since the last successful build.";
+        return "Displays the changes since the last unstable or successful build.";
     }
 
     @Override
@@ -44,12 +34,11 @@ public class ChangesSinceLastSuccessfulBuildContent
     {
         AbstractBuild<P, B> firstIncludedBuild = build;
 
-        B prev = firstIncludedBuild.getPreviousBuild();
-        while ( prev != null && prev.getResult() != Result.SUCCESS )
-        {
-            firstIncludedBuild = prev;
-            prev = firstIncludedBuild.getPreviousBuild();
-        }
+			B prev = firstIncludedBuild.getPreviousBuild();
+			while (prev != null && prev.getResult().isWorseThan(Result.UNSTABLE)) {
+				firstIncludedBuild = prev;
+				prev = firstIncludedBuild.getPreviousBuild();
+			}
 
         return firstIncludedBuild;
     }

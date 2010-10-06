@@ -20,21 +20,21 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @SuppressWarnings({"unchecked"})
-public class ChangesSinceLastSuccessfulBuildContentTest {
+public class ChangesSinceLastUnstableBuildContentTest {
 
-    private ChangesSinceLastSuccessfulBuildContent content;
+    private ChangesSinceLastUnstableBuildContent content;
 
     private Map<String, Object> args;
 
     @Before
     public void setUp() {
-        content = new ChangesSinceLastSuccessfulBuildContent();
+        content = new ChangesSinceLastUnstableBuildContent();
 
         args = new HashMap<String, Object>();
     }
 
     @Test
-    public void testGetContent_shouldGetNoContentSinceSuccessfulBuildIfNoPreviousBuild() {
+    public void testGetContent_shouldGetNoContentSinceUnstableBuildIfNoPreviousBuild() {
         AbstractBuild build = mock(AbstractBuild.class);
 
         String contentStr = content.getContent(build, null, null, args);
@@ -77,9 +77,9 @@ public class ChangesSinceLastSuccessfulBuildContentTest {
         assertEquals("Changes for Build #42\n" + "[Ash Lux] Changes for a successful build.\n" + "\n" + "\n" +
             "Changes for Build #41\n" + "[Ash Lux] Changes for a failed build.\n" + "\n" + "\n", contentStr);
     }
-
+    
     @Test
-    public void testGetContent_shouldGetPreviousBuildsThatArentSuccessful_HUDSON3519() {
+    public void testGetContent_shouldGetPreviousBuildsThatArentUnstable_HUDSON3519() {
         // Test for HUDSON-3519
 
         AbstractBuild successfulBuild = createBuild(Result.SUCCESS, 2, "Changes for a successful build.");
@@ -100,16 +100,13 @@ public class ChangesSinceLastSuccessfulBuildContentTest {
         when (notBuiltBuild.getPreviousBuild()).thenReturn(failureBuild);
         when(failureBuild.getNextBuild()).thenReturn(notBuiltBuild);
 
-        AbstractBuild currentBuild = createBuild(Result.SUCCESS, 7, "Changes for a successful build.");
+        AbstractBuild currentBuild = createBuild(Result.UNSTABLE, 7, "Changes for an unstable build.");
         when(currentBuild.getPreviousBuild()).thenReturn(notBuiltBuild);
         when(notBuiltBuild.getNextBuild()).thenReturn(currentBuild);
 
         String contentStr = content.getContent(currentBuild, null, null, args);
 
-        assertEquals("Changes for Build #3\n" +
-                "[Ash Lux] Changes for an unstable build.\n" +
-                "\n" +
-                "\n" +
+        assertEquals(
                 "Changes for Build #4\n" +
                 "[Ash Lux] Changes for an aborted build.\n" +
                 "\n" +
@@ -123,11 +120,11 @@ public class ChangesSinceLastSuccessfulBuildContentTest {
                 "\n" +
                 "\n" +
                 "Changes for Build #7\n" +
-                "[Ash Lux] Changes for a successful build.\n" +
+                "[Ash Lux] Changes for an unstable build.\n" +
                 "\n" +
                 "\n", contentStr);
     }
-
+    
     @Test
     public void testShouldPrintDate()
     {
@@ -194,7 +191,7 @@ public class ChangesSinceLastSuccessfulBuildContentTest {
             "\tPATH2\n" + "\tPATH3\n" + "\n" + "\n" + "Changes for Build #42\n" +
             "[Ash Lux] Changes for a successful build.\n" + "\tPATH1\n" + "\tPATH2\n" + "\tPATH3\n" + "\n" + "\n", contentStr );
     }
-
+    
     private AbstractBuild createBuild(Result result, int buildNumber, String message) {
         AbstractBuild build = mock(AbstractBuild.class);
         when(build.getResult()).thenReturn(result);
